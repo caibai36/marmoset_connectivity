@@ -20,9 +20,9 @@ foreach m ( ${monkey} )
 foreach r ( ${run})
 foreach a ( ${acpr})
 
-set apth = /Users/dschaeff/google_drive/Documents/Manuscripts/open_source_seed_corr/Nature_Neuroscience/code/test_uwo/${m}#path to individual subject BOLD files
-set stats_dir = /Users/dschaeff/google_drive/Documents/Manuscripts/open_source_seed_corr/Nature_Neuroscience/code/test_uwo/${m}#path to statistics output
-set acqpth = /Users/dschaeff/google_drive/Documents/Manuscripts/open_source_seed_corr/Nature_Neuroscience/code/test_uwo/${m}#acquisition parameter for topup correction, required for PE correction only
+set apth = #path to individual subject BOLD files
+set stats_dir = #path to statistics output
+set acqpth = #acquisition parameter for topup correction, required for PE correction only
 
 set output_dir = ${apth}/${m}_${r}.results
 set temp_dir = ${apth}/temp
