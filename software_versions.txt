@@ -1,0 +1,11 @@
+All code run on 2020 iMAC, macOS Big Sur 11.0.1
+
+AFNI: Version AFNI_20.3.02 'Vespasian'
+
+FSL: FSL 6.0.4
+
+ANTS: 2.3.5.dev212-g44225
+
+Connectome Workbench: Version 1.4.2
+
+Python: 3.9.2
