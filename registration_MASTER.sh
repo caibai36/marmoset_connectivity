@@ -2,7 +2,7 @@
 
 # user specifications
 
-set monkey = () #m1 m2...
+set monkey = () #sub-01 sub-02...
 set run = () #1 2...
 set pe = (up down) #phase encoding directions, UWO = up, NIH = up down
 
@@ -30,28 +30,28 @@ endif
 
 ## flirt mean functional to t2 with skull
 if(! -f ${temp_dir}/${m}_${p}_${r}.mean_to_t2.nii.gz)then
-flirt -searchrx -360 360 -searchry -360 360 -searchrz -360 360 -in ${m}_${p}_${r}.mean.nii.gz -ref ${apth}/InplaneT2.nii.gz -out ${temp_dir}/${m}_${p}_${r}.mean_to_t2.nii.gz -omat ${temp_dir}/${m}_${p}_${r}.mean_to_t2.mat
+flirt -searchrx -360 360 -searchry -360 360 -searchrz -360 360 -in ${m}_${p}_${r}.mean.nii.gz -ref ${apth}/${m}_InplaneT2.nii.gz -out ${temp_dir}/${m}_${p}_${r}.mean_to_t2.nii.gz -omat ${temp_dir}/${m}_${p}_${r}.mean_to_t2.mat
 endif
 
 if(! -f ${temp_dir}/errts.${m}_${p}_${r}.tproject_to_t2.nii.gz)then
-flirt -in errts.${m}_${p}_${r}.tproject.nii.gz -ref ${apth}/InplaneT2.nii.gz -applyxfm -init ${temp_dir}/${m}_${p}_${r}.mean_to_t2.mat -out ${temp_dir}/errts.${m}_${p}_${r}.tproject_to_t2.nii.gz -interp trilinear
+flirt -in errts.${m}_${p}_${r}.tproject.nii.gz -ref ${apth}/${m}_InplaneT2.nii.gz -applyxfm -init ${temp_dir}/${m}_${p}_${r}.mean_to_t2.mat -out ${temp_dir}/errts.${m}_${p}_${r}.tproject_to_t2.nii.gz -interp trilinear
 endif
 
-if(! -f ${temp_dir}/mask_to_t2.nii.gz)then
-flirt -searchrx -360 360 -searchry -360 360 -searchrz -360 360 -in ${apth}/mask.nii.gz -ref ${apth}/InplaneT2.nii.gz -out ${temp_dir}/mask_to_t2.nii.gz
+if(! -f ${temp_dir}/${m}_mask_to_t2.nii.gz)then
+flirt -searchrx -360 360 -searchry -360 360 -searchrz -360 360 -in ${apth}/${m}_mask.nii.gz -ref ${apth}/${m}_InplaneT2.nii.gz -out ${temp_dir}/${m}_mask_to_t2.nii.gz
 endif
 
-if(! -f ${temp_dir}/mask_to_t2_binary.nii.gz)then
-3dcalc -a ${temp_dir}/mask_to_t2.nii.gz -expr 'ispositive(a)' -prefix ${temp_dir}/mask_to_t2_binary.nii.gz
+if(! -f ${temp_dir}/${m}_mask_to_t2_binary.nii.gz)then
+3dcalc -a ${temp_dir}/${m}_mask_to_t2.nii.gz -expr 'ispositive(a)' -prefix ${temp_dir}/${m}_mask_to_t2_binary.nii.gz
 endif
 
-if(! -f ${temp_dir}/InplaneT2_masked.nii.gz)then
-3dcalc -a ${apth}/InplaneT2.nii.gz -b ${temp_dir}/mask_to_t2_binary.nii.gz -expr '(a*b)' -prefix ${temp_dir}/InplaneT2_masked.nii.gz
+if(! -f ${temp_dir}/${m}_InplaneT2_masked.nii.gz)then
+3dcalc -a ${apth}/${m}_InplaneT2.nii.gz -b ${temp_dir}/${m}_mask_to_t2_binary.nii.gz -expr '(a*b)' -prefix ${temp_dir}/${m}_InplaneT2_masked.nii.gz
 endif
 
 ## register t2, no skull, to Template
 if(! -f ${temp_dir}/${m}_t2_to_template_.5iso_Warped.nii.gz)then
-antsRegistrationSyNQuick.sh -d 3 -f ${mskpth}/template_T2w_brain_.5iso.nii.gz -m ${temp_dir}/InplaneT2_masked.nii.gz -o ${temp_dir}/${m}_t2_to_template_.5iso_
+antsRegistrationSyNQuick.sh -d 3 -f ${mskpth}/template_T2w_brain_.5iso.nii.gz -m ${temp_dir}/${m}_InplaneT2_masked.nii.gz -o ${temp_dir}/${m}_t2_to_template_.5iso_
 endif
 
 if(! -f ${temp_dir}/errts.${m}_${p}_${r}.tproject_to_template.nii.gz)then
