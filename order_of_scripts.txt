@@ -1,0 +1,13 @@
+1. rs_MASTER.sh - preprocessing of RS-fMRI data
+
+2. registration_MASTER.sh - registers the RS-fMRI data to template space based on individual's t2 weighted image
+
+3. correlation_MASTER.sh - calculates the correlation between each voxel and every other voxel
+
+4. split_volume_MASTER.m - matlab code, separates output of correlation_MASTER.sh into more managable files sizes (one file per seed/voxel)
+
+5. ttest_MASTER_UWOandNIH_individual.sh - computes individual level T (Z) statistic across runs
+
+6. ttest_MASTER_UWOandNIH_group.sh - computes group-level T (Z) statistic after individual animal level analyses (4, above)
+
+7. volume2surface_MASTER.sh - generates surface files
