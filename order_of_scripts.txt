@@ -8,11 +8,9 @@
 
 4. split_volume_MASTER.m # matlab code, separates output of correlation_MASTER.sh into more managable files sizes (one file per seed/voxel)
 
-5. ttest_MASTER_UWOandNIH_individual.sh # computes individual level T (Z) statistic across runs
+5. ttest_MASTER_UWOandNIH_group.sh # computes group-level T (Z) statistic after individual animal level analyses (4, above)
 
-6. ttest_MASTER_UWOandNIH_group.sh # computes group-level T (Z) statistic after individual animal level analyses (4, above)
-
-7. volume2surface_MASTER.sh # generates surface files
+6. volume2surface_MASTER.sh # generates surface files
 
 
 # Other code
