@@ -15,7 +15,7 @@ if [ -e ${zdir}/group_${k}_${j}_${i}_Z.nii.gz ]; then
 
 input=${zdir}/group_${k}_${j}_${i}_Z.nii.gz
 
-## average values between pial and white surface
+## average values between pial and white surface, here .R.(rh) is for right hemisphere. Employ .L.(lh) for left hemisphere. 
 if [ ! -f ${sdir}/group_${k}_${j}_${i}_Z.R.func.gii ]; then
 wb_command -volume-to-surface-mapping ${input} ${template_dir}/surfFS.rh.graymid.surf.gii ${sdir}/group_${k}_${j}_${i}_Z.R.func.gii -ribbon-constrained ${template_dir}/surfFS.rh.white.surf.gii ${template_dir}/surfFS.rh.pial.surf.gii
 fi
