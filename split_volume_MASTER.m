@@ -1,7 +1,7 @@
 clear all
 tic
 
-
+% iterate through all voxels 
 x_mat=59; 
 y_mat=80; 
 z_mat=54; 
