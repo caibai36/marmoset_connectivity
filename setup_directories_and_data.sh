@@ -1,23 +1,37 @@
 #!/bin/bash
 
 # ==========================================
-# SETUP SCRIPT: Marmoset Vocalization Analysis
+# MARMOSET VOCALIZATION ANALYSIS - SETUP
 # ==========================================
 # Creates directory structure and organizes data
-# Run this BEFORE running registration_MASTER_UPDATED.sh
+# Location: /work01/home/bin-wu/workspace/projects/clib/egs/riken/riken_mri_s0/local/fmri/local/
 # ==========================================
 
 # ==========================================
-# CONFIGURATION - Your actual paths
+# PATHS CONFIGURATION
 # ==========================================
 
+# Raw data location
 RAW_DATA_DIR="/data02/share/bin-wu/data/marmoset/brain/nih_uwo/nih/NIH-data"
-WORK_BASE="/work01/home/bin-wu/workspace/projects/clib/egs/riken/riken_mri_s0/exp/mri/sandbox/marmoset_registration"
+
+# MBM template directory (0.5mm downsampled)
 MBM_TEMPLATE_DIR="/data02/share/bin-wu/data/marmoset/brain/nih_uwo/marmoset_brain_mapping_v3/Marmoset_Brain_Mappping_v3.0.1/MBM_v3.0.1_0.5mm"
 
+# Original marmoset_connectivity scripts location
+ORIGINAL_SCRIPTS_DIR="/work02/home/bin-wu/workspace/projects/tests/test_fmri/marmoset_connectivity"
+
+# Working base directory for all outputs
+WORK_BASE="/work01/home/bin-wu/workspace/projects/clib/egs/riken/riken_mri_s0/exp/mri/sandbox/marmoset_registration"
+
+# Scripts directory (where this script is located)
+SCRIPTS_DIR="/work01/home/bin-wu/workspace/projects/clib/egs/riken/riken_mri_s0/local/fmri/local"
+
 echo "=========================================="
-echo "MARMOSET REGISTRATION SETUP"
+echo "MARMOSET VOCALIZATION ANALYSIS - SETUP"
 echo "=========================================="
+echo ""
+echo "Scripts location: $SCRIPTS_DIR"
+echo "Working directory: $WORK_BASE"
 echo ""
 
 # ==========================================
@@ -27,47 +41,57 @@ echo ""
 echo "Step 1: Creating directory structure..."
 echo ""
 
-mkdir -p $WORK_BASE/{preprocessed,anatomical,template_space,correlation,temp,roi_masks,logs}
+mkdir -p $WORK_BASE/{raw_bold,preprocessed,anatomical,template_space,correlation,temp,roi_masks,logs,results}
 
 echo "  Created directories in: $WORK_BASE"
-echo "    - preprocessed/     : Preprocessed BOLD input (from rs_MASTER.sh)"
+echo "    - raw_bold/         : Raw BOLD data (copied from NIH dataset)"
+echo "    - preprocessed/     : Preprocessed BOLD output (from rs_MASTER.sh)"
 echo "    - anatomical/       : T2 and mask files per subject"
 echo "    - template_space/   : Intermediate registration outputs"
 echo "    - correlation/      : Final connectivity-ready files"
-echo "    - temp/             : Temporary files (will be cleaned)"
+echo "    - temp/             : Temporary files"
 echo "    - roi_masks/        : Vocalization network ROI masks"
 echo "    - logs/             : Processing logs"
+echo "    - results/          : Final analysis results"
 echo ""
 
 # ==========================================
-# STEP 2: Link/copy anatomical data
+# STEP 2: Copy/link raw BOLD data
 # ==========================================
 
-echo "Step 2: Organizing anatomical data..."
+echo "Step 2: Linking raw BOLD data..."
 echo ""
 
-# NIH subjects (m6-m32, excluding m13)
+# NIH subjects
 SUBJECTS=(m6 m7 m8 m9 m10 m11 m12 m14 m15 m16 m17 m18 m19 m20 m21 m22 m23 m24 m25 m26 m27 m28 m29 m30 m31 m32)
 
 for subj in "${SUBJECTS[@]}"; do
     if [ -d "$RAW_DATA_DIR/$subj" ]; then
         echo "  Processing $subj..."
 
-        # Create subject anatomical directory
+        # Create subject directories
+        mkdir -p $WORK_BASE/raw_bold/$subj
         mkdir -p $WORK_BASE/anatomical/$subj
+        mkdir -p $WORK_BASE/preprocessed/$subj
+
+        # Link BOLD files (save space, don't copy)
+        if [ -f "$RAW_DATA_DIR/$subj/BOLD_up_1.nii.gz" ]; then
+            ln -sf "$RAW_DATA_DIR/$subj"/BOLD_*.nii.gz "$WORK_BASE/raw_bold/$subj/"
+            ln -sf "$RAW_DATA_DIR/$subj"/SEEPI_*.nii.gz "$WORK_BASE/raw_bold/$subj/" 2>/dev/null
+            bold_count=$(ls $WORK_BASE/raw_bold/$subj/BOLD_*.nii.gz 2>/dev/null | wc -l)
+            echo "    ✓ Linked $bold_count BOLD files"
+        fi
 
         # Copy anatomical files
         if [ -f "$RAW_DATA_DIR/$subj/InplaneT2.nii.gz" ]; then
-            cp "$RAW_DATA_DIR/$subj/InplaneT2.nii.gz" \
-               "$WORK_BASE/anatomical/$subj/"
+            cp "$RAW_DATA_DIR/$subj/InplaneT2.nii.gz" "$WORK_BASE/anatomical/$subj/"
             echo "    ✓ Copied InplaneT2.nii.gz"
         else
             echo "    ✗ InplaneT2.nii.gz not found"
         fi
 
         if [ -f "$RAW_DATA_DIR/$subj/mask.nii.gz" ]; then
-            cp "$RAW_DATA_DIR/$subj/mask.nii.gz" \
-               "$WORK_BASE/anatomical/$subj/"
+            cp "$RAW_DATA_DIR/$subj/mask.nii.gz" "$WORK_BASE/anatomical/$subj/"
             echo "    ✓ Copied mask.nii.gz"
         else
             echo "    ✗ mask.nii.gz not found"
@@ -86,7 +110,6 @@ echo ""
 echo "Step 3: Verifying MBM template files..."
 echo ""
 
-# Check required template files
 REQUIRED_FILES=(
     "template_T2w_brain_0.5mm.nii.gz"
     "segmentation_three_types_prob_1_gray_0.5mm.nii.gz"
@@ -109,7 +132,7 @@ done
 if [ $MISSING -gt 0 ]; then
     echo ""
     echo "  ERROR: $MISSING template files missing!"
-    echo "  Please verify template directory: $MBM_TEMPLATE_DIR"
+    exit 1
 else
     echo ""
     echo "  ✓ All template files found!"
@@ -124,16 +147,15 @@ echo ""
 echo "Step 4: Creating subject metadata file..."
 echo ""
 
-# Copy metadata from original location
 METADATA_SRC="/data02/share/bin-wu/data/marmoset/brain/nih_uwo/nih_uwo_meta.csv"
 
 if [ -f "$METADATA_SRC" ]; then
     cp "$METADATA_SRC" "$WORK_BASE/subject_metadata.csv"
-    echo "  ✓ Metadata copied to: $WORK_BASE/subject_metadata.csv"
+    echo "  ✓ Metadata copied"
     echo ""
-    echo "  Subject summary:"
-    tail -n +2 "$WORK_BASE/subject_metadata.csv" | \
-        awk -F',' '{print "    " $1 " - Age: " $2 "mo, Sex: " $3 ", Site: " $4}' | head -10
+    echo "  Subject summary (NIH 7T only):"
+    tail -n +2 "$WORK_BASE/subject_metadata.csv" | grep "NIH" | \
+        awk -F',' '{printf "    %-10s Age: %3smo, Sex: %s, Runs: %s\n", $1, $2, $3, $7}' | head -15
     echo "    ..."
 else
     echo "  ⚠ Metadata file not found: $METADATA_SRC"
@@ -142,7 +164,118 @@ fi
 echo ""
 
 # ==========================================
-# STEP 5: Create README with instructions
+# STEP 5: Create configuration file
+# ==========================================
+
+cat > $WORK_BASE/config_paths.sh << EOFCONFIG
+#!/bin/bash
+# ==========================================
+# MARMOSET VOCALIZATION ANALYSIS - PATH CONFIG
+# ==========================================
+# Source this file in all processing scripts
+# Usage: source config_paths.sh
+# ==========================================
+
+# Raw data
+export RAW_DATA_DIR="$RAW_DATA_DIR"
+
+# MBM templates
+export MBM_TEMPLATE_DIR="$MBM_TEMPLATE_DIR"
+
+# Original scripts
+export ORIGINAL_SCRIPTS_DIR="$ORIGINAL_SCRIPTS_DIR"
+
+# Working directories
+export WORK_BASE="$WORK_BASE"
+export SCRIPTS_DIR="$SCRIPTS_DIR"
+
+# Subdirectories
+export RAW_BOLD_DIR="\${WORK_BASE}/raw_bold"
+export PREPROCESSED_DIR="\${WORK_BASE}/preprocessed"
+export ANATOMICAL_DIR="\${WORK_BASE}/anatomical"
+export TEMPLATE_SPACE_DIR="\${WORK_BASE}/template_space"
+export CORRELATION_DIR="\${WORK_BASE}/correlation"
+export TEMP_DIR="\${WORK_BASE}/temp"
+export ROI_MASKS_DIR="\${WORK_BASE}/roi_masks"
+export LOGS_DIR="\${WORK_BASE}/logs"
+export RESULTS_DIR="\${WORK_BASE}/results"
+
+# Template files (specific)
+export TEMPLATE_BRAIN="\${MBM_TEMPLATE_DIR}/template_T2w_brain_0.5mm.nii.gz"
+export TEMPLATE_GRAY="\${MBM_TEMPLATE_DIR}/segmentation_three_types_prob_1_gray_0.5mm.nii.gz"
+export TEMPLATE_WHITE="\${MBM_TEMPLATE_DIR}/segmentation_three_types_prob_2_white_0.5mm.nii.gz"
+export TEMPLATE_CSF="\${MBM_TEMPLATE_DIR}/segmentation_three_types_prob_3_csf_0.5mm.nii.gz"
+
+# Atlas files
+export ATLAS_CORTICAL="\${MBM_TEMPLATE_DIR}/atlas_MBM_cortex_vPaxinos_0.5mm.nii.gz"
+export ATLAS_SUBCORTICAL="\${MBM_TEMPLATE_DIR}/atlas_MBM_subcortical_beta_0.5mm.nii.gz"
+
+# Subject list (NIH only)
+export NIH_SUBJECTS=(m6 m7 m8 m9 m10 m11 m12 m14 m15 m16 m17 m18 m19 m20 m21 m22 m23 m24 m25 m26 m27 m28 m29 m30 m31 m32)
+
+echo "Configuration loaded:"
+echo "  Working base: \$WORK_BASE"
+echo "  Scripts: \$SCRIPTS_DIR"
+echo "  Templates: \$MBM_TEMPLATE_DIR"
+EOFCONFIG
+
+chmod +x $WORK_BASE/config_paths.sh
+
+echo "  ✓ Configuration file created: $WORK_BASE/config_paths.sh"
+echo ""
+
+# ==========================================
+# STEP 6: Create status checker
+# ==========================================
+
+cat > $WORK_BASE/check_status.sh << 'EOFSTATUS'
+#!/bin/bash
+
+source $(dirname $0)/config_paths.sh
+
+echo "=========================================="
+echo "MARMOSET REGISTRATION STATUS"
+echo "=========================================="
+echo ""
+
+echo "Working directory: $WORK_BASE"
+echo ""
+
+echo "1. Raw BOLD data:"
+ls -d $RAW_BOLD_DIR/m* 2>/dev/null | wc -l | xargs echo "   Subjects with raw data:"
+ls $RAW_BOLD_DIR/m6/BOLD_*.nii.gz 2>/dev/null | wc -l | xargs echo "   Example (m6) BOLD files:"
+
+echo ""
+echo "2. Anatomical files:"
+ls -d $ANATOMICAL_DIR/m* 2>/dev/null | wc -l | xargs echo "   Subjects ready:"
+
+echo ""
+echo "3. Preprocessed BOLD:"
+ls $PREPROCESSED_DIR/m*/errts.*.nii.gz 2>/dev/null | wc -l | xargs echo "   Preprocessed files:"
+
+echo ""
+echo "4. Template space (registered):"
+ls $CORRELATION_DIR/*_to_template_0.5mm_masked_gm.nii.gz 2>/dev/null | wc -l | xargs echo "   Registered files:"
+
+echo ""
+echo "5. ROI masks:"
+ls $ROI_MASKS_DIR/*.nii.gz 2>/dev/null | wc -l | xargs echo "   ROI files:"
+
+echo ""
+echo "Disk usage:"
+du -sh $WORK_BASE
+du -sh $WORK_BASE/* | sort -h
+
+echo ""
+EOFSTATUS
+
+chmod +x $WORK_BASE/check_status.sh
+
+echo "  ✓ Status checker created: $WORK_BASE/check_status.sh"
+echo ""
+
+# ==========================================
+# STEP 7: Create README
 # ==========================================
 
 cat > $WORK_BASE/README.txt << 'EOFREADME'
@@ -151,86 +284,69 @@ MARMOSET VOCALIZATION DEVELOPMENT ANALYSIS
 
 Directory Structure:
 --------------------
-preprocessed/     - Preprocessed BOLD from rs_MASTER.sh (INPUT - you need to populate this)
-anatomical/       - T2 and mask files per subject (READY)
-template_space/   - Intermediate registration files (OUTPUT)
-correlation/      - Final connectivity-ready files (OUTPUT)
-temp/            - Temporary processing files (OUTPUT)
-roi_masks/       - Vocalization network ROI masks (created by STAGE1)
-logs/            - Processing logs
+raw_bold/        - Raw BOLD data from NIH dataset (linked)
+preprocessed/    - Preprocessed BOLD from run_preprocessing.sh
+anatomical/      - T2 and mask files (ready)
+template_space/  - Intermediate registration files
+correlation/     - Final connectivity-ready files
+temp/           - Temporary processing files
+roi_masks/      - Vocalization network ROI masks
+logs/           - All processing logs
+results/        - Final analysis outputs
 
-Quick Start:
-------------
-1. Run preprocessing first (rs_MASTER.sh) to generate:
-   - errts.{subject}_{pe}_bold_{run}.tproject.nii.gz
-   - {subject}_{pe}_bold_{run}.mean.nii.gz
-   Place these in: preprocessed/
+Complete Workflow:
+------------------
 
-2. Run registration:
-   tcsh -xef registration_MASTER_UPDATED.sh 2>&1 | tee logs/registration.log
+STEP 1: Setup (DONE by running setup_directories_and_data.sh)
+   ✓ Directories created
+   ✓ Raw data linked
+   ✓ Anatomical files copied
+   ✓ Templates verified
 
-3. Run vocalization analysis pipeline:
-   bash STAGE1_create_marmoset_vocalization_ROIs.sh
-   bash STAGE3_register_and_prepare_ROI_data.sh
-   python STAGE4_extract_ROI_timeseries.py
-   python STAGE5_compute_connectivity.py
-   python STAGE6_developmental_analysis.py
-   python STAGE7_cross_species_comparison.py
+STEP 2: Preprocess BOLD data
+   cd local/fmri/local
+   bash run_preprocessing.sh m6    # Test with one subject
+   bash run_preprocessing.sh all   # Process all subjects
 
-Files Required in preprocessed/:
----------------------------------
-For each subject (e.g., m6), run (e.g., 1), and phase encoding (e.g., u):
-- errts.m6_u_bold_1.tproject.nii.gz  (preprocessed 4D BOLD)
-- m6_u_bold_1.mean.nii.gz            (mean functional image)
+   Output: preprocessed/m6/errts.m6_u_bold_1.tproject.nii.gz
+                        /m6_u_bold_1.mean.nii.gz
 
-Expected Outputs in correlation/:
-----------------------------------
-- {subject}_{pe}_bold_{run}_to_template_0.5mm_masked_gm.nii.gz
-- {subject}_{pe}_bold_{run}_nui_regressors.1D
+STEP 3: Register to template
+   bash run_registration.sh m6     # Test with one subject
+   bash run_registration.sh all    # Process all subjects
 
-These files are ready for ROI-based connectivity analysis!
+   Output: correlation/m6_u_bold_1_to_template_0.5mm_masked_gm.nii.gz
+
+STEP 4: Extract vocalization ROIs
+   bash run_stage1_rois.sh
+
+STEP 5: Extract ROI time series
+   python run_stage4_timeseries.py
+
+STEP 6: Compute connectivity
+   python run_stage5_connectivity.py
+
+STEP 7: Developmental analysis
+   python run_stage6_development.py
+
+STEP 8: Cross-species comparison
+   python run_stage7_comparison.py
+
+Check Status:
+-------------
+bash check_status.sh
+
+Configuration:
+--------------
+All paths are in: config_paths.sh
+Source this in any custom scripts: source config_paths.sh
+
+Logs:
+-----
+All logs saved to: logs/
 EOFREADME
 
 echo "  ✓ README created: $WORK_BASE/README.txt"
-echo ""
-
-# ==========================================
-# STEP 6: Create quick reference script
-# ==========================================
-
-cat > $WORK_BASE/check_status.sh << EOFCHECK
-#!/bin/bash
-
-# Quick status checker
-
-WORK_BASE="$WORK_BASE"
-
-echo "=========================================="
-echo "MARMOSET REGISTRATION STATUS CHECK"
-echo "=========================================="
-echo ""
-
-echo "Anatomical files ready:"
-ls -d \$WORK_BASE/anatomical/m* 2>/dev/null | wc -l | xargs echo "  Subjects:"
-
-echo ""
-echo "Preprocessed BOLD files:"
-ls \$WORK_BASE/preprocessed/errts.*.nii.gz 2>/dev/null | wc -l | xargs echo "  Files:"
-
-echo ""
-echo "Registered files (template space):"
-ls \$WORK_BASE/correlation/*_to_template_0.5mm_masked_gm.nii.gz 2>/dev/null | wc -l | xargs echo "  Files:"
-
-echo ""
-echo "Disk usage:"
-du -sh \$WORK_BASE
-du -sh \$WORK_BASE/*
-
-echo ""
-EOFCHECK
-
-chmod +x $WORK_BASE/check_status.sh
-echo "  ✓ Status checker created: $WORK_BASE/check_status.sh"
 echo ""
 
 # ==========================================
@@ -243,18 +359,17 @@ echo "=========================================="
 echo ""
 echo "Working directory: $WORK_BASE"
 echo ""
-echo "Next steps:"
+echo "Files ready:"
+echo "  ✓ Raw BOLD data linked ($(ls -d $WORK_BASE/raw_bold/m* 2>/dev/null | wc -l) subjects)"
+echo "  ✓ Anatomical files copied ($(ls -d $WORK_BASE/anatomical/m* 2>/dev/null | wc -l) subjects)"
+echo "  ✓ Configuration: $WORK_BASE/config_paths.sh"
+echo "  ✓ Status checker: $WORK_BASE/check_status.sh"
 echo ""
-echo "1. Run preprocessing (rs_MASTER.sh) if not done yet"
-echo "   Output should go to: $WORK_BASE/preprocessed/"
-echo ""
-echo "2. Run registration:"
-echo "   cd /path/to/scripts"
-echo "   tcsh -xef registration_MASTER_UPDATED.sh 2>&1 | tee $WORK_BASE/logs/registration.log"
-echo ""
-echo "3. Check status anytime:"
-echo "   bash $WORK_BASE/check_status.sh"
+echo "Next step: Preprocess BOLD data"
+echo "  cd $SCRIPTS_DIR"
+echo "  bash run_preprocessing.sh m6"
 echo ""
 echo "For detailed instructions, see:"
-echo "   $WORK_BASE/README.txt"
+echo "  - $WORK_BASE/README.txt"
+echo "  - $SCRIPTS_DIR/PREPROCESSING_GUIDE.md"
 echo ""

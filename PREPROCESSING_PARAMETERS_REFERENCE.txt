@@ -1,0 +1,114 @@
+#!/bin/bash
+
+# ==========================================
+# Quick Reference: Subject-Specific Parameters for rs_MASTER.sh
+# ==========================================
+# Based on actual preprocessing of m6
+# Update these values for each subject
+# ==========================================
+
+cat << 'EOF'
+PREPROCESSING PARAMETERS REFERENCE
+==================================
+
+Based on successful m6 preprocessing:
+
+UNIVERSAL PARAMETERS (same for all NIH subjects):
+-------------------------------------------------
+set pe = (up down)                    # NIH has both phase encodings
+set bp_l = (0.1)                      # Bandpass low frequency
+set bp_h = (0.01)                     # Bandpass high frequency
+set pe_correct = (no)                 # No distortion correction available
+set acpr = (dummy)                    # Placeholder (not used when pe_correct=no)
+set blur = (1.5)                      # Spatial blurring in mm
+set n_cpu = (8)                       # Parallel processing cores
+
+SUBJECT-SPECIFIC PARAMETERS (check for each subject):
+-----------------------------------------------------
+set monkey = (m6)                     # Subject ID
+set run = (1 2 3 4)                   # Number of runs (CHECK THIS!)
+set tr_counts = (348)                 # Volumes per run (from dim4)
+set reg_vol = (174)                   # Middle volume (tr_counts/2)
+set tr = (6)                          # TR in seconds (from pixdim4)
+
+PATHS (template - replace m6 with actual subject):
+---------------------------------------------------
+set apth = /work01/.../marmoset_registration/raw_bold/m6
+set anat_pth = /work01/.../marmoset_registration/anatomical/m6
+set output_dir = /work01/.../marmoset_registration/preprocessed/m6
+
+HOW TO GET PARAMETERS FOR EACH SUBJECT:
+========================================
+
+1. Check number of runs:
+   ls /work01/.../marmoset_registration/raw_bold/m6/BOLD_up_*.nii.gz | wc -l
+
+2. Check dimensions:
+   fslinfo /work01/.../marmoset_registration/raw_bold/m6/BOLD_up_1.nii.gz
+
+   Extract these values:
+   dim4    -> tr_counts (number of volumes)
+   pixdim4 -> tr (TR in seconds)
+
+3. Calculate middle volume:
+   reg_vol = tr_counts / 2
+
+4. Verify phase encodings:
+   ls /work01/.../marmoset_registration/raw_bold/m6/BOLD_*.nii.gz
+
+   Should see both BOLD_up_*.nii.gz and BOLD_down_*.nii.gz for NIH data
+
+EXAMPLE SCRIPT TO GET PARAMETERS:
+=================================
+
+#!/bin/bash
+SUBJECT="m6"
+RAW_DIR="/work01/.../marmoset_registration/raw_bold/${SUBJECT}"
+
+echo "Subject: $SUBJECT"
+echo ""
+
+# Count runs
+N_RUNS=$(ls $RAW_DIR/BOLD_up_*.nii.gz 2>/dev/null | wc -l)
+echo "Number of runs: $N_RUNS"
+echo "set run = ($(seq -s ' ' 1 $N_RUNS))"
+echo ""
+
+# Get dimensions from first run
+BOLD_FILE="$RAW_DIR/BOLD_up_1.nii.gz"
+TR_COUNTS=$(fslinfo $BOLD_FILE | grep "^dim4" | awk '{print $2}')
+TR=$(fslinfo $BOLD_FILE | grep "^pixdim4" | awk '{print $2}')
+REG_VOL=$((TR_COUNTS / 2))
+
+echo "Volumes per run: $TR_COUNTS"
+echo "set tr_counts = ($TR_COUNTS)"
+echo ""
+
+echo "Middle volume: $REG_VOL"
+echo "set reg_vol = ($REG_VOL)"
+echo ""
+
+echo "TR (seconds): $TR"
+echo "set tr = ($TR)"
+echo ""
+
+# Check phase encodings
+HAS_UP=$(ls $RAW_DIR/BOLD_up_*.nii.gz 2>/dev/null | wc -l)
+HAS_DOWN=$(ls $RAW_DIR/BOLD_down_*.nii.gz 2>/dev/null | wc -l)
+
+if [ $HAS_UP -gt 0 ] && [ $HAS_DOWN -gt 0 ]; then
+    echo "Phase encodings: up and down"
+    echo "set pe = (up down)"
+elif [ $HAS_UP -gt 0 ]; then
+    echo "Phase encodings: up only"
+    echo "set pe = (up)"
+else
+    echo "ERROR: No BOLD files found!"
+fi
+
+EOF
+
+echo ""
+echo "Run this script to get parameters for any subject:"
+echo "  bash get_subject_parameters.sh m7"
+echo ""
